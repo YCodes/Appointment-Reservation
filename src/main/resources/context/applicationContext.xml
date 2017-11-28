@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:task="http://www.springframework.org/schema/task" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:jpa="http://www.springframework.org/schema/data/jpa"
+	xsi:schemaLocation="
+      http://www.springframework.org/schema/beans 
+      http://www.springframework.org/schema/beans/spring-beans.xsd
+ 	  http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+      http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd
+      http://www.springframework.org/schema/data/jpa http://www.springframework.org/schema/data/jpa/spring-jpa.xsd
+      http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-3.0.xsd">
+
+	<context:property-placeholder location="classpath:application.properties" />
+
+	<bean id="entityManagerFactory"
+		class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<property name="packagesToScan" value="edu.mum.domain" />
+		<property name="jpaVendorAdapter">
+			<bean class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter" />
+		</property>
+		<property name="jpaProperties">
+			<props>
+				<prop key="hibernate.hbm2ddl.auto">update</prop>
+				<prop key="hibernate.dialect">${hibernate.dialect}</prop>
+				<prop key="hibernate.show_sql">${hibernate.show_sql}</prop>
+				<prop key="use_sql_comments">${use_sql_comments}</prop>
+				<prop key="hibernate.format_sql">${hibernate.format_sql}</prop>
+				<prop key="hibernate.hbm2ddl.import_files">populate.sql</prop>
+			</props>
+		</property>
+	</bean>
+
+	<bean id="dataSource"
+		class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+		<property name="driverClassName" value="${jdbc.driverClassName}" />
+		<property name="url" value="${jdbc.url}" />
+		<property name="username" value="${jdbc.username}" />
+		<property name="password" value="${jdbc.password}" />
+	</bean>
+
+	<bean id="transactionManager" class="org.springframework.orm.jpa.JpaTransactionManager">
+		<property name="entityManagerFactory" ref="entityManagerFactory" />
+	</bean>
+
+	<bean id="mailSender" class="org.springframework.mail.javamail.JavaMailSenderImpl">
+		<!-- SMTP settings -->
+		<property name="host" value="smtp.gmail.com" />
+		<property name="port" value="587" />
+		<property name="username" value="tmchecking@gmail.com" />
+		<property name="password" value="***********" />
+
+		<property name="javaMailProperties">
+			<!-- additional properties specific to JavaMail -->
+			<props>
+				<prop key="mail.transport.protocol">smtp</prop>
+				<prop key="mail.smtp.auth">true</prop>
+				<prop key="mail.smtp.ssl.trust">smtp.gmail.com</prop>
+				<prop key="mail.smtp.starttls.enable">true</prop>
+			</props>
+		</property>
+	</bean>
+
+	<bean id="scheduledTasks" class="edu.mum.service.impl.ScheduleAppointment" />
+
+	<task:scheduler id="taskScheduler" pool-size="30" />
+
+	<task:scheduled-tasks>
+		<task:scheduled ref="scheduledTasks" method="sendReminderEmail"
+			fixed-rate="60000" />
+	</task:scheduled-tasks>
+
+	<!-- Mail sending must be queued. Here is the task executor -->
+	<bean id="taskExecutor"
+		class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+		<property name="corePoolSize" value="5" />
+		<property name="maxPoolSize" value="25" />
+		<property name="queueCapacity" value="100" />
+	</bean>
+	<task:annotation-driven executor="taskExecutor" />
+
+
+	<!-- Scan for transaction-based resources -->
+	<context:component-scan base-package="edu.mum.service,edu.mum.repository" />
+
+	<tx:annotation-driven transaction-manager="transactionManager" />
+
+	<bean id="persistenceExceptionTranslationPostProcessor"
+		class="org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor" />
+
+	<jpa:repositories base-package="edu.mum.repository" />
+
+</beans>
